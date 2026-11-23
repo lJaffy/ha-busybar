@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.5
+
+- Root cause of the silent exit-1: init-emulator/up was an empty file, so
+  the oneshot ran nothing and "succeeded" without writing port/firmware;
+  the emulator then failed its guard and exited 1 before logging anything.
+  up now points at the run script. Also moved the user bundle from
+  s6-rc.d/user to user-bundles.d/user (the old location is deprecated and
+  logged a warning on every boot).
+
 ## 0.1.4
 
 - Diagnose the silent emulator: log node version, port and firmware before

@@ -17,13 +17,12 @@ FIRMWARE="${EMU_FIRMWARE:-$(cat /run/busy-emulator/firmware 2>/dev/null)}"
 bashio::log.info "Starting emulator: node $(node --version), port=${PORT} firmware=${FIRMWARE} data=/data/emulator"
 
 # The app's log_level maps onto the emulator's --verbose (prints where a
-# failed start failed); trace/debug enable it.
+# failed start failed); trace/debug enable it. log_level defaults to info
+# in config.yaml so this read always succeeds.
 VERBOSE=()
-if bashio::config.exists 'log_level'; then
-    case "$(bashio::config 'log_level')" in
-        trace|debug) VERBOSE=(--verbose) ;;
-    esac
-fi
+case "$(bashio::config 'log_level')" in
+    trace|debug) VERBOSE=(--verbose) ;;
+esac
 
 # shellcheck disable=SC2086
 exec node /opt/busy-emulator/server/index.mjs \
