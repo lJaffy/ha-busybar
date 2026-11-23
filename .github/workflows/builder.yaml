@@ -10,6 +10,14 @@ on:
   push:
     branches:
       - main
+  # Manual fallback: force a build when change detection misbehaves.
+  # Leave app empty to build all apps.
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "App to build (empty = all)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -43,21 +51,33 @@ jobs:
           APPS: ${{ steps.apps.outputs.addons }}
           CHANGED_FILES: ${{ steps.changed_files.outputs.all_changed_files }}
         run: |
+          echo "event=${{ github.event_name }} ref=${{ github.ref }}"
+          echo "APPS=${APPS}"
+          echo "CHANGED_FILES=${CHANGED_FILES}"
           changed_apps=()
 
+          # Manual run: build the requested app, or everything
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ -n "${{ inputs.app }}" ]]; then
+              changed_apps=(${{ inputs.app }})
+            else
+              changed_apps=(${APPS})
+            fi
           # If a workflow file itself changed, rebuild all apps
-          if [[ "${CHANGED_FILES}" =~ \.github/workflows/.*\.ya?ml ]]; then
+          elif [[ "${CHANGED_FILES}" =~ \.github/workflows/.*\.ya?ml ]]; then
             changed_apps=(${APPS})
           else
             for app in ${APPS}; do
-              # Match app/<file> or app/**/<file> so nested changes
-              # (e.g. rootfs/etc/.../run scripts) also trigger a rebuild
-              for file in ${MONITORED_FILES}; do
-                if [[ "${CHANGED_FILES}" =~ (^|[[:space:]])${app}(/[^[:space:]]*)?/${file}(/|$) ]]; then
-                  changed_apps+=("${app}")
-                  break
-                fi
-              done
+          # Match app/<file> or app/**/<file> so nested changes
+          # (e.g. rootfs/etc/.../run scripts) also trigger a rebuild.
+          # Token boundaries are start/space/end: changed-files lists are
+          # space-separated, so a trailing "(/|$)" misses mid-list files.
+          for file in ${MONITORED_FILES}; do
+            if [[ "${CHANGED_FILES}" =~ (^|[[:space:]])${app}/(.*/)?${file}(/|[[:space:]]|$) ]]; then
+              changed_apps+=("${app}")
+              break
+            fi
+          done
             done
           fi
 
