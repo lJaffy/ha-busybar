@@ -25,9 +25,11 @@ profile busybar_emulator flags=(attach_disconnected,mediate_deleted) {
   # Options and other files of the app
   /data/** rw,
 
-  # Run the emulator stack in its own, stricter profile
+  # Run the emulator stack in its own, stricter profiles. Transition targets
+  # must be exact paths: a glob here fails the compile with "merged rule
+  # with conflicting x modifiers".
   /usr/bin/node cx -> emulator_node,
-  /usr/bin/python3* cx -> emulator_relay,
+  /usr/bin/python3 cx -> emulator_relay,
   /usr/sbin/nginx cx -> emulator_nginx,
 
   profile emulator_node flags=(attach_disconnected,mediate_deleted) {
@@ -42,7 +44,7 @@ profile busybar_emulator flags=(attach_disconnected,mediate_deleted) {
     /tmp/** rwk,
 
     # Node runtime needs exec of itself + proc/self maps
-    /usr/bin/node rix,
+    /usr/bin/node rmix,
     /usr/lib/node_modules/** r,
     /proc/@{pid}/** r,
     /sys/devices/system/cpu/online r,
@@ -61,8 +63,8 @@ profile busybar_emulator flags=(attach_disconnected,mediate_deleted) {
     signal (receive) peer=*_busybar_emulator,
 
     /usr/bin/busy-relay r,
-    /usr/bin/python3* rix,
-    /usr/lib/python*/** r,
+    /usr/bin/python3 rmix,
+    /usr/lib/python3*/** r,
     /data/** rw,
     /dev/null rw,
     /dev/tty rw,
