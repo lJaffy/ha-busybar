@@ -1,0 +1,29 @@
+#!/command/with-contenv bashio
+# ==============================================================================
+# init-emulator (oneshot): validate options, prepare /data, resolve firmware.
+# ==============================================================================
+
+declare port
+port=$(bashio::config 'port')
+
+if ! [[ "${port}" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
+    bashio::log.error "Invalid port: ${port} (must be 1-65535)"
+    exit 1
+fi
+
+FIRMWARE=$(bashio::config 'firmware')
+case "${FIRMWARE}" in
+    latest) EMU_FIRMWARE="1.4.1" ;;
+    1.4.1|1.3.1) EMU_FIRMWARE="${FIRMWARE}" ;;
+    *) bashio::log.error "Invalid firmware: ${FIRMWARE}"; exit 1 ;;
+esac
+
+export EMU_PORT="${port}"
+export EMU_FIRMWARE
+# Persist for the longrun service (s6 run scripts get a fresh env).
+mkdir -p /run/busy-emulator
+echo "${port}" > /run/busy-emulator/port
+echo "${EMU_FIRMWARE}" > /run/busy-emulator/firmware
+
+mkdir -p /data/emulator
+bashio::log.info "BUSY Bar emulator: port=${port} firmware=${EMU_FIRMWARE} data=/data/emulator"

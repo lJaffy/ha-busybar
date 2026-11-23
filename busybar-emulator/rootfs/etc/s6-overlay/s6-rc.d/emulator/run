@@ -1,0 +1,16 @@
+#!/command/with-contenv bashio
+# ==============================================================================
+# emulator (longrun): the headless BUSY Bar server itself.
+# Binds 127.0.0.1 only (upstream HOST constant); relay-api exposes it on the
+# container network, and the BUSY mobile app / busy-hacs reach it via the
+# mapped host port.
+# ==============================================================================
+# shellcheck disable=SC1091
+
+PORT=$(cat /run/busy-emulator/port)
+FIRMWARE=$(cat /run/busy-emulator/firmware)
+
+exec node /opt/busy-emulator/server/index.mjs \
+    --port "${PORT}" \
+    --data /data/emulator \
+    --firmware "${FIRMWARE}"

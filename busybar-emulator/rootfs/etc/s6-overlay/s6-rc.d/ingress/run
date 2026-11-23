@@ -1,0 +1,8 @@
+#!/command/with-contenv bashio
+# ==============================================================================
+# ingress (longrun): nginx on 8099 serving the /emulator window through
+# Home Assistant ingress. Supervisor-only access (see ingress.conf).
+# ==============================================================================
+# shellcheck disable=SC1091
+
+exec nginx -g "daemon off; error_log /dev/stdout info;"

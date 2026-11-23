@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Host-header-rewriting TCP relay for the BUSY Bar emulator.
+
+The emulator's entry guard (entry-guard.mjs) only admits requests whose
+Host header is 127.0.0.1:<port> or localhost:<port>. A plain socat relay
+preserves the client's original Host (e.g. 192.168.x.x:8640) and is refused
+with 403. This relay rewrites Host to 127.0.0.1:<target> before forwarding,
+and streams both directions afterwards. No request/response parsing beyond
+the header block; bodies and WebSocket upgrades pass through untouched.
+"""
+import socket
+import sys
+import threading
+
+LISTEN_PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8640
+TARGET_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8640
+
+
+def pipe(a, b):
+    try:
+        while True:
+            chunk = a.recv(65536)
+            if not chunk:
+                break
+            b.sendall(chunk)
+    except OSError:
+        pass
+    finally:
+        try:
+            b.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+
+
+def handle(client):
+    server = socket.socket()
+    try:
+        server.connect(("127.0.0.1", TARGET_PORT))
+    except OSError:
+        client.close()
+        return
+    try:
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = client.recv(1)
+            if not chunk:
+                client.close()
+                server.close()
+                return
+            head += chunk
+            if len(head) > 65536:
+                client.close()
+                server.close()
+                return
+        header, rest = head.split(b"\r\n\r\n", 1)
+        lines = header.split(b"\r\n")
+        fixed = [lines[0]] + [
+            b"Host: 127.0.0.1:" + str(TARGET_PORT).encode()
+            if ln.lower().startswith(b"host:")
+            else ln
+            for ln in lines[1:]
+        ]
+        server.sendall(b"\r\n".join(fixed) + b"\r\n\r\n" + rest)
+        t = threading.Thread(target=pipe, args=(server, client), daemon=True)
+        t.start()
+        pipe(client, server)
+    finally:
+        client.close()
+        server.close()
+
+
+sock = socket.socket()
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock.bind(("0.0.0.0", LISTEN_PORT))
+sock.listen(50)
+print(f"relay 0.0.0.0:{LISTEN_PORT} -> 127.0.0.1:{TARGET_PORT} (Host rewritten)", flush=True)
+while True:
+    conn, _ = sock.accept()
+    threading.Thread(target=handle, args=(conn,), daemon=True).start()

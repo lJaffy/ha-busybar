@@ -1,0 +1,4 @@
+#!/command/execlineb -P
+# If the emulator crashes, take the container down so the Supervisor's
+# watchdog can restart the app instead of leaving a half-working relay.
+s6-svc -O .
