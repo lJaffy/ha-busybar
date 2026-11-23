@@ -1,7 +1,7 @@
 name: Builder
 
 env:
-  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs"
+  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs apparmor.txt translations"
 
 on:
   pull_request:
@@ -24,6 +24,10 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v7.0.1
+        with:
+          # Full history: change detection diffs against the base commit,
+          # which needs more than the default shallow clone on push events
+          fetch-depth: 0
 
       - name: Get changed files
         id: changed_files
@@ -41,13 +45,15 @@ jobs:
         run: |
           changed_apps=()
 
-          # If the workflow file itself changed, rebuild all apps
-          if [[ "${CHANGED_FILES}" =~ \.github/workflows/(builder|build-app)\.yaml ]]; then
+          # If a workflow file itself changed, rebuild all apps
+          if [[ "${CHANGED_FILES}" =~ \.github/workflows/.*\.ya?ml ]]; then
             changed_apps=(${APPS})
           else
             for app in ${APPS}; do
+              # Match app/<file> or app/**/<file> so nested changes
+              # (e.g. rootfs/etc/.../run scripts) also trigger a rebuild
               for file in ${MONITORED_FILES}; do
-                if [[ "${CHANGED_FILES}" =~ ${app}/${file} ]]; then
+                if [[ "${CHANGED_FILES}" =~ (^|[[:space:]])${app}(/[^[:space:]]*)?/${file}(/|$) ]]; then
                   changed_apps+=("${app}")
                   break
                 fi
