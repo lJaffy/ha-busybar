@@ -5,4 +5,4 @@
 # ==============================================================================
 # shellcheck disable=SC1091
 
-exec nginx -g "daemon off; error_log /dev/stdout info;"
+exec nginx -c /etc/nginx/nginx.conf -g "daemon off;"

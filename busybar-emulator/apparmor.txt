@@ -74,17 +74,21 @@ profile busybar_emulator flags=(attach_disconnected,mediate_deleted) {
 
   profile emulator_nginx flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
+    #include <abstractions/nameservice>
 
     signal (receive) peer=*_busybar_emulator,
 
-    /usr/sbin/nginx rix,
+    # nginx runs as root here (no user switching), so it needs passwd/group
+    # lookups and ownership-neutral paths; logs go to stderr, pid to /run.
+    capability net_bind_service,
+    /usr/sbin/nginx rmix,
     /etc/nginx/** r,
-    /var/lib/nginx/** rw,
-    /var/log/nginx/** w,
     /run/nginx.pid rw,
     /run/nginx/** rw,
     /dev/null rw,
     /dev/tty rw,
+    /dev/stderr w,
+    /dev/stdout w,
 
     network inet tcp,
   }

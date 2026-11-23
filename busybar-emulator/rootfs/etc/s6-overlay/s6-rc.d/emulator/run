@@ -7,8 +7,10 @@
 # ==============================================================================
 # shellcheck disable=SC1091
 
-PORT=$(cat /run/busy-emulator/port)
-FIRMWARE=$(cat /run/busy-emulator/firmware)
+PORT="${EMU_PORT:-$(cat /run/busy-emulator/port 2>/dev/null)}"
+FIRMWARE="${EMU_FIRMWARE:-$(cat /run/busy-emulator/firmware 2>/dev/null)}"
+: "${PORT:?EMU_PORT unset: init-emulator must run first}"
+: "${FIRMWARE:?EMU_FIRMWARE unset: init-emulator must run first}"
 
 exec node /opt/busy-emulator/server/index.mjs \
     --port "${PORT}" \

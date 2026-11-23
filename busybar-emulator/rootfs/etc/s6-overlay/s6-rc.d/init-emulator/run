@@ -20,10 +20,14 @@ esac
 
 export EMU_PORT="${port}"
 export EMU_FIRMWARE
-# Persist for the longrun service (s6 run scripts get a fresh env).
-mkdir -p /run/busy-emulator
+# Persist for the longrun services. S6 gives each run script a fresh env,
+# so export alone does not reach them (hence the missing /run file): write
+# container_environment files, which with-contenv loads for later services.
+mkdir -p /run/busy-emulator /var/run/s6/container_environment
 echo "${port}" > /run/busy-emulator/port
 echo "${EMU_FIRMWARE}" > /run/busy-emulator/firmware
+printf '%s' "${port}" > /var/run/s6/container_environment/EMU_PORT
+printf '%s' "${EMU_FIRMWARE}" > /var/run/s6/container_environment/EMU_FIRMWARE
 
 mkdir -p /data/emulator
 bashio::log.info "BUSY Bar emulator: port=${port} firmware=${EMU_FIRMWARE} data=/data/emulator"

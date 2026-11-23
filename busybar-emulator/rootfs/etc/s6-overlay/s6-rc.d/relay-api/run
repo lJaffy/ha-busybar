@@ -11,7 +11,8 @@
 # ==============================================================================
 # shellcheck disable=SC1091
 
-PORT=$(cat /run/busy-emulator/port)
+PORT="${EMU_PORT:-$(cat /run/busy-emulator/port 2>/dev/null)}"
+: "${PORT:?EMU_PORT unset: init-emulator must run first}"
 
 for _ in $(seq 1 60); do
     if (echo > /dev/tcp/127.0.0.1/"${PORT}") >/dev/null 2>&1; then

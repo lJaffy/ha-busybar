@@ -43,7 +43,11 @@ ENV LANG=C.UTF-8 \
 # rootfs/usr/bin rewrites the Host header, which the emulator's entry guard
 # requires to be 127.0.0.1:<port> — a plain TCP forward gets a 403.)
 RUN apk add --no-cache nodejs nginx python3 \
-    && mkdir -p /run/nginx /opt/busy-emulator /data/emulator
+    && mkdir -p /run/nginx /opt/busy-emulator /data/emulator \
+    # Stock /etc/nginx/nginx.conf drops privileges to the "nginx" user, which
+    # cannot run under this app's profile (see rootfs/etc/nginx/nginx.conf).
+    # S6 services below run with `user root` anyway; keep one canonical copy.
+    && rm -f /etc/nginx/nginx.conf
 
 # Emulator core only: headless server + firmware WASM. Electron app
 # (packages/app), 3D stage (packages/stage, proprietary Tride player +
