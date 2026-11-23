@@ -10,12 +10,27 @@
 #   8640 - emulated BUSY Bar HTTP API + /emulator window + state stream WS
 #   8099 - ingress proxy target: nginx on 8099 serves the /emulator window
 #          through Home Assistant ingress (see ingress.conf)
+#
+# Emulator sources are fetched in a throwaway stage so the final image
+# carries no git client. codeload serves the tag as a tarball; the strip
+# leaves packages/, LICENSE and THIRD_PARTY_NOTICES.md at the stage root.
+# The layer re-downloads only when EMULATOR_VERSION changes.
+ARG EMULATOR_VERSION=v0.1.0-beta.7
+FROM alpine:3.24 AS fetch
+ARG EMULATOR_VERSION
+RUN apk add --no-cache curl tar \
+    && curl -fsSL "https://codeload.github.com/busy-app/busybar-emulator/tar.gz/refs/tags/${EMULATOR_VERSION}" -o /tmp/emulator.tar.gz \
+    && mkdir -p /emulator \
+    && tar -xzf /tmp/emulator.tar.gz -C /emulator --strip-components=1 \
+    && test -f /emulator/packages/engine/build/1.4.1/runtime.wasm \
+    && test -f /emulator/packages/engine/build/1.3.1/runtime.wasm \
+    && rm /tmp/emulator.tar.gz
+
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM ${BUILD_FROM}
 
 ARG BUILD_ARCH
 ARG BUILD_VERSION
-ARG EMULATOR_VERSION=v0.1.0-beta.7
 
 ENV LANG=C.UTF-8 \
     BUSY_EMULATOR_NO_UPDATE_CHECK=1 \
@@ -32,16 +47,10 @@ RUN apk add --no-cache nodejs nginx python3 \
 # Emulator core only: headless server + firmware WASM. Electron app
 # (packages/app), 3D stage (packages/stage, proprietary Tride player +
 # (c) Flipper 3D model) and dev tools are deliberately excluded.
-# Shallow-clone the pinned release tag for reproducibility; the Dockerfile
-# layer caches it until EMULATOR_VERSION changes.
-RUN git clone --depth 1 --branch "${EMULATOR_VERSION}" \
-      https://github.com/busy-app/busybar-emulator.git /tmp/emulator \
-    && cp -r /tmp/emulator/packages/server /opt/busy-emulator/server \
-    && cp -r /tmp/emulator/packages/engine /opt/busy-emulator/engine \
-    && cp /tmp/emulator/LICENSE /opt/busy-emulator/ \
-    && cp /tmp/emulator/THIRD_PARTY_NOTICES.md /opt/busy-emulator/ \
-    && rm -rf /tmp/emulator \
-    && node --check /opt/busy-emulator/server/index.mjs \
+COPY --from=fetch /emulator/packages/server /opt/busy-emulator/server
+COPY --from=fetch /emulator/packages/engine /opt/busy-emulator/engine
+COPY --from=fetch /emulator/LICENSE /emulator/THIRD_PARTY_NOTICES.md /opt/busy-emulator/
+RUN node --check /opt/busy-emulator/server/index.mjs \
     && test -f /opt/busy-emulator/engine/build/1.4.1/runtime.wasm \
     && test -f /opt/busy-emulator/engine/build/1.3.1/runtime.wasm
 
