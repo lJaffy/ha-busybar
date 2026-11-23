@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.8
+
+- Fix busy-hacs setup failure (GET /api/storage/list -> 400): the emulator
+  serves /ext/apps_assets reads from its build tree but lists only the data
+  folder, so a fresh /data 400s paths a physical bar answers. init-emulator
+  now seeds bar/ext/apps_assets from the firmware build on first boot (and
+  re-seeds when the firmware build changes), never overwriting user files.
+- Fix HA sidebar refusing the window in Firefox: the emulator answers
+  frame-ancestors 'none', which forbids even same-origin framing through
+  ingress. The ingress proxy now strips the upstream framing headers and
+  re-asserts SAMEORIGIN (true through ingress); direct access keeps the
+  emulator's own headers.
+
 ## 0.1.7
 
 - Fix intermittent 403 "request was not addressed to this emulator": the

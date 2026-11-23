@@ -47,4 +47,31 @@ sed "s/__EMU_INT_PORT__/${INT_PORT}/g" \
     /etc/nginx/ingress.conf.template > /etc/nginx/http.d/ingress.conf
 
 mkdir -p /data/emulator
+
+# Seed the firmware's shipped assets. The emulator serves /ext/apps_assets
+# reads from its build tree, but storage/list only looks at the data folder,
+# so a fresh /data 400s listings a physical bar answers (e.g. busy-hacs
+# reads /ext/apps_assets/busy/themes at setup and fails setup on 400).
+# Copy once (never overwrite user changes); keep a stamp so firmware
+# switches re-seed only when the build's manifest differs.
+ASSETS_SRC="/opt/busy-emulator/engine/build/apps-assets"
+ASSETS_DST="/data/emulator/bar/ext/apps_assets"
+ASSETS_STAMP="/data/emulator/.apps_assets_stamp"
+BUILD_INFO="/opt/busy-emulator/engine/build/${EMU_FIRMWARE}/build-info.json"
+if [ -d "${ASSETS_SRC}" ]; then
+    STAMP="$(cat "${BUILD_INFO}" 2>/dev/null || echo "${EMU_FIRMWARE}")"
+    if [ ! -f "${ASSETS_STAMP}" ] || [ "$(cat "${ASSETS_STAMP}" 2>/dev/null)" != "${STAMP}" ]; then
+        bashio::log.info "Seeding shipped apps_assets (firmware ${EMU_FIRMWARE})..."
+        mkdir -p "${ASSETS_DST}"
+        # Copy without clobbering anything the user added or changed.
+        # (BusyBox cp ignores "src/." with -r, so copy entry by entry.)
+        for entry in "${ASSETS_SRC}"/*; do
+            cp -rn "${entry}" "${ASSETS_DST}/"
+        done
+        printf '%s' "${STAMP}" > "${ASSETS_STAMP}"
+    fi
+else
+    bashio::log.warning "Shipped apps_assets not found at ${ASSETS_SRC}; storage listings under /ext/apps_assets will 400"
+fi
+
 bashio::log.info "BUSY Bar emulator: port=${port} internal=${INT_PORT} firmware=${EMU_FIRMWARE} data=/data/emulator"

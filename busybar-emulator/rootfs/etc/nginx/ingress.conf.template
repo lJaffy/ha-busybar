@@ -13,7 +13,21 @@ server {
     # paths (/emulator/*, /_nuxt/*) which resolve against the ingress prefix,
     # so the page is served from the root here and sub_filter rewrites them
     # to relative URLs that stay under /api/hassio_ingress/<token>/.
+    #
+    # Framing: the emulator answers frame-ancestors 'none' + X-Frame-Options
+    # SAMEORIGIN (correct for direct access: its window must not be embedded
+    # by other origins). But the HA sidebar loads this page in an iframe from
+    # the HA origin — same-origin through ingress, yet 'none' forbids even
+    # that, so Firefox refuses to load it. Strip the upstream framing headers
+    # here, at the Supervisor-only ingress proxy, and re-assert SAMEORIGIN:
+    # through ingress the page IS same-origin, direct access keeps the
+    # emulator's own headers untouched.
     location / {
+        proxy_hide_header Content-Security-Policy;
+        proxy_hide_header X-Frame-Options;
+        add_header Content-Security-Policy "frame-ancestors 'self'" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+
         sub_filter_once off;
         sub_filter 'href="/emulator/' 'href="./emulator/';
         sub_filter 'src="/emulator/' 'src="./emulator/';
