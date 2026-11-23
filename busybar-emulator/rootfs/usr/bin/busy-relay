@@ -6,7 +6,15 @@ Host header is 127.0.0.1:<port> or localhost:<port>. A plain socat relay
 preserves the client's original Host (e.g. 192.168.x.x:8640) and is refused
 with 403. This relay rewrites Host to 127.0.0.1:<target> before forwarding,
 and streams both directions afterwards. No request/response parsing beyond
-the header block; bodies and WebSocket upgrades pass through untouched.
+the header block; bodies stream raw in both directions.
+
+Hardening, because the entry guard refuses anything else with 403:
+absolute-form request lines are normalized to origin-form (the guard
+compares an absolute authority against Host); duplicate Host headers are
+collapsed to exactly one rewritten Host; non-upgrade requests get
+Connection: close so a second request on a reused keep-alive connection
+cannot slip through with its original Host. WebSocket upgrades keep
+their Connection header and stay on the long-lived bidirectional pipe.
 
 Bounded concurrency: a fixed worker pool (100 connection slots) with socket
 timeouts, so a connection burst (Supervisor health checks, HA polling,
@@ -17,6 +25,7 @@ file descriptors (Errno 24).
 import concurrent.futures
 import socket
 import sys
+from urllib.parse import urlsplit
 
 LISTEN_PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8640
 TARGET_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8640
@@ -61,7 +70,7 @@ def handle(client):
     try:
         head = b""
         while b"\r\n\r\n" not in head:
-            chunk = client.recv(1)
+            chunk = client.recv(4096)
             if not chunk:
                 return
             head += chunk
@@ -69,13 +78,40 @@ def handle(client):
                 return
         header, rest = head.split(b"\r\n\r\n", 1)
         lines = header.split(b"\r\n")
-        fixed = [lines[0]] + [
-            b"Host: 127.0.0.1:" + str(TARGET_PORT).encode()
-            if ln.lower().startswith(b"host:")
-            else ln
-            for ln in lines[1:]
-        ]
-        server.sendall(b"\r\n".join(fixed) + b"\r\n\r\n" + rest)
+
+        # Origin-form request line: the guard refuses absolute-form lines
+        # whose authority differs from Host (RFC 9112 3.2.2), and some
+        # clients/proxies send them. Strip scheme+authority, keep path+query.
+        parts = lines[0].split(b" ")
+        if len(parts) >= 3:
+            try:
+                u = urlsplit(parts[1].decode("ascii"))
+                if u.scheme in ("http", "https") and u.netloc:
+                    parts[1] = (u.path or "/").encode("ascii")
+                    if u.query:
+                        parts[1] += b"?" + u.query.encode("ascii")
+                    lines[0] = b" ".join(parts)
+            except (ValueError, UnicodeDecodeError):
+                pass
+
+        # Exactly one Host header, rewritten to the emulator's own address.
+        # Duplicates (or a missing one) are refused by the guard.
+        host = b"Host: 127.0.0.1:" + str(TARGET_PORT).encode()
+        body = [ln for ln in lines[1:] if not ln.lower().startswith(b"host:")]
+
+        # WebSocket state stream: long-lived, pass Connection through and
+        # keep the bidirectional pipe until either side goes away.
+        is_upgrade = any(ln.lower().startswith(b"upgrade:") for ln in body)
+        if is_upgrade:
+            out = [lines[0], host] + body
+        else:
+            # Single request per upstream connection: force Connection: close
+            # so a second request on a reused keep-alive client connection
+            # cannot slip through with its original (wrong) Host unrewritten.
+            out = [lines[0], host] + [
+                ln for ln in body if not ln.lower().startswith(b"connection:")
+            ] + [b"Connection: close"]
+        server.sendall(b"\r\n".join(out) + b"\r\n\r\n" + rest)
         t = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         # Stream server->client in the background; this direction runs here.
         fut = t.submit(pipe, server, client)

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.7
+
+- Fix intermittent 403 "request was not addressed to this emulator": the
+  relay now normalizes absolute-form request lines to origin-form, collapses
+  duplicate Host headers to exactly one rewritten Host, and forces
+  Connection: close on non-upgrade requests so a second request on a reused
+  keep-alive connection cannot pass with its original Host. WebSocket
+  upgrades keep their Connection header on the long-lived pipe. Verified:
+  absolute-form, duplicate Host, keep-alive reuse, WS 101 handshake, and
+  token mint (POST with body) all pass; 100KB body behaves identically
+  direct and via relay.
+
 ## 0.1.6
 
 - Fix "port in use" on every port: the relay and the emulator cannot share
