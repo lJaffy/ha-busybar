@@ -8,6 +8,11 @@
   runs under Docker's default AppArmor profile, like the official nginx
   add-on. nginx.conf returns to near-stock (user nginx, compiled-in temp
   paths), ingress/run only ensures /run/nginx exists for the pid file.
+- Fix relay collapsing under burst load (Errno 24, no file descriptors):
+  bounded 100-connection worker pool with socket timeouts and prompt close
+  instead of unbounded thread-per-connection; relay-api now exits non-zero
+  if the emulator never comes up, so s6 restarts instead of proxying into
+  a refused port.
 
 ## 0.1.1
 
