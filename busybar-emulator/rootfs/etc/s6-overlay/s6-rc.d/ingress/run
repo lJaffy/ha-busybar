@@ -5,11 +5,8 @@
 # ==============================================================================
 # shellcheck disable=SC1091
 
-# nginx opens its compiled-in error log (/var/lib/nginx/logs/error.log)
-# before parsing nginx.conf, so point it at stderr here; the config file
-# repeats the same setting for nginx -T and any child re-execs.
-# Temp dirs (compiled to /var/lib/nginx/tmp/*) are overridden to /run in
-# nginx.conf; create them here since /run is tmpfs and starts empty.
-mkdir -p /run/nginx/tmp/client_body /run/nginx/tmp/proxy \
-    /run/nginx/tmp/fastcgi /run/nginx/tmp/uwsgi /run/nginx/tmp/scgi
+# nginx opens its compiled-in default error log (prefix/logs/error.log)
+# before parsing nginx.conf, so also point it at stderr here; the config
+# file repeats the setting for nginx -T and any child re-execs.
+mkdir -p /run/nginx
 exec nginx -e stderr -c /etc/nginx/nginx.conf -g "daemon off;"
