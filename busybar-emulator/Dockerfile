@@ -16,6 +16,7 @@
 # leaves packages/, LICENSE and THIRD_PARTY_NOTICES.md at the stage root.
 # The layer re-downloads only when EMULATOR_VERSION changes.
 ARG EMULATOR_VERSION=v0.1.0-beta.7
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
 FROM alpine:3.24 AS fetch
 ARG EMULATOR_VERSION
 RUN apk add --no-cache curl tar \
@@ -26,7 +27,7 @@ RUN apk add --no-cache curl tar \
     && test -f /emulator/packages/engine/build/1.3.1/runtime.wasm \
     && rm /tmp/emulator.tar.gz
 
-ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24
+ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 ARG BUILD_ARCH
