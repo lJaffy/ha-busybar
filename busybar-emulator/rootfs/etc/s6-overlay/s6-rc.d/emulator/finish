@@ -1,4 +1,33 @@
-#!/command/execlineb -P
-# If the emulator crashes, take the container down so the Supervisor's
-# watchdog can restart the app instead of leaving a half-working relay.
-s6-svc -O .
+#!/command/with-contenv bashio
+# ==============================================================================
+# emulator/finish: runs every time node exits. Crash (non-zero, or killed by
+# a signal other than SIGTERM) takes the whole container down so the
+# Supervisor's watchdog restarts the app instead of idling with a dead
+# emulator and zero log output. Clean SIGTERM shutdown (container stopping)
+# takes everything down. A clean exit (should not happen) lets s6 restart it.
+# ==============================================================================
+# shellcheck disable=SC1091
+
+readonly results="/run/s6-linux-init-container-results/exitcode"
+exit_code="${1}"
+signal_no="${2}"
+
+bashio::log.info "Emulator exited with code ${exit_code} (signal ${signal_no})"
+
+if [[ "${exit_code}" -eq 256 ]]; then
+    # Killed by a signal: SIGTERM means the container is stopping.
+    if [[ "${signal_no}" -eq 15 ]]; then
+        exec /run/s6/basedir/bin/halt
+    fi
+    # Any other signal is a crash.
+    if [[ "$(cat "${results}" 2>/dev/null || echo 0)" -eq 0 ]]; then
+        echo $((128 + signal_no)) > "${results}"
+    fi
+    exec /run/s6/basedir/bin/halt
+elif [[ "${exit_code}" -ne 0 ]]; then
+    if [[ "$(cat "${results}" 2>/dev/null || echo 0)" -eq 0 ]]; then
+        echo "${exit_code}" > "${results}"
+    fi
+    exec /run/s6/basedir/bin/halt
+fi
+# exit 0: let s6 restart the service.

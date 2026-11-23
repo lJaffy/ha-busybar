@@ -12,7 +12,22 @@ FIRMWARE="${EMU_FIRMWARE:-$(cat /run/busy-emulator/firmware 2>/dev/null)}"
 : "${PORT:?EMU_PORT unset: init-emulator must run first}"
 : "${FIRMWARE:?EMU_FIRMWARE unset: init-emulator must run first}"
 
+# Leave a trace even if node dies silently: the emulator buffers all startup
+# output until it is ready, so a hang mid-startup otherwise prints nothing.
+bashio::log.info "Starting emulator: node $(node --version), port=${PORT} firmware=${FIRMWARE} data=/data/emulator"
+
+# The app's log_level maps onto the emulator's --verbose (prints where a
+# failed start failed); trace/debug enable it.
+VERBOSE=()
+if bashio::config.exists 'log_level'; then
+    case "$(bashio::config 'log_level')" in
+        trace|debug) VERBOSE=(--verbose) ;;
+    esac
+fi
+
+# shellcheck disable=SC2086
 exec node /opt/busy-emulator/server/index.mjs \
     --port "${PORT}" \
     --data /data/emulator \
-    --firmware "${FIRMWARE}"
+    --firmware "${FIRMWARE}" \
+    ${VERBOSE[@]+"${VERBOSE[@]}"}

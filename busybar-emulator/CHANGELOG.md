@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.4
+
+- Diagnose the silent emulator: log node version, port and firmware before
+  exec (the emulator buffers all startup output until ready, so a hang
+  printed nothing); map app log_level trace/debug to the emulator's
+  --verbose flag (prints where a failed start failed).
+- Fix emulator/finish: the old s6-svc -O . never took the container down on
+  a crash, leaving a dead emulator with zero log output. Crash or
+  non-SIGTERM signal now halts the container so the watchdog restarts it.
+
 ## 0.1.2
 
 - Root-cause fix for the permission-error chain: delete the hand-written
