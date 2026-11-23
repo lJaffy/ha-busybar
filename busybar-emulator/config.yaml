@@ -1,6 +1,6 @@
 name: "BUSY Bar Emulator"
 slug: "busybar_emulator"
-version: "0.1.2"
+version: "0.1.3"
 description: "Self-contained virtual BUSY Bar: the emulator's headless server with its HTTP API and flat window UI, controllable by the BUSY HACS integration — no physical device needed."
 url: "https://github.com/lJaffy/ha-busybar/tree/main/busybar-emulator"
 arch:
