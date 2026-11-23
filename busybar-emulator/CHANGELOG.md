@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.6
+
+- Fix "port in use" on every port: the relay and the emulator cannot share
+  one port. Relay-first makes the emulator's someoneListens probe refuse
+  the port as taken; emulator-first makes the relay's 0.0.0.0 bind fail
+  with EADDRINUSE (upstream take() documents this). Two-port split: the
+  emulator takes loopback-only port+1 (never mapped), the relay listens on
+  the public port and forwards with Host rewritten to the internal one.
+  init-emulator renders ingress.conf from a template with the internal
+  port; port option is now validated as 1-65534.
+
 ## 0.1.5
 
 - Root cause of the silent exit-1: init-emulator/up was an empty file, so

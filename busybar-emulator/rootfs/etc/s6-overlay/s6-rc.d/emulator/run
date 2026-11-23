@@ -8,13 +8,15 @@
 # shellcheck disable=SC1091
 
 PORT="${EMU_PORT:-$(cat /run/busy-emulator/port 2>/dev/null)}"
+INT_PORT="${EMU_INT_PORT:-$(cat /run/busy-emulator/int_port 2>/dev/null)}"
 FIRMWARE="${EMU_FIRMWARE:-$(cat /run/busy-emulator/firmware 2>/dev/null)}"
 : "${PORT:?EMU_PORT unset: init-emulator must run first}"
+: "${INT_PORT:?EMU_INT_PORT unset: init-emulator must run first}"
 : "${FIRMWARE:?EMU_FIRMWARE unset: init-emulator must run first}"
 
 # Leave a trace even if node dies silently: the emulator buffers all startup
 # output until it is ready, so a hang mid-startup otherwise prints nothing.
-bashio::log.info "Starting emulator: node $(node --version), port=${PORT} firmware=${FIRMWARE} data=/data/emulator"
+bashio::log.info "Starting emulator: node $(node --version), port=${PORT} internal=${INT_PORT} firmware=${FIRMWARE} data=/data/emulator"
 
 # The app's log_level maps onto the emulator's --verbose (prints where a
 # failed start failed); trace/debug enable it. log_level defaults to info
@@ -25,8 +27,10 @@ case "$(bashio::config 'log_level')" in
 esac
 
 # shellcheck disable=SC2086
+# --port is the loopback-only internal port (see init-emulator/run): the
+# relay owns the public port and forwards with a rewritten Host header.
 exec node /opt/busy-emulator/server/index.mjs \
-    --port "${PORT}" \
+    --port "${INT_PORT}" \
     --data /data/emulator \
     --firmware "${FIRMWARE}" \
     ${VERBOSE[@]+"${VERBOSE[@]}"}

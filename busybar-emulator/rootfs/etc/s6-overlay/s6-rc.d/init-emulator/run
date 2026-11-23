@@ -6,10 +6,19 @@
 declare port
 port=$(bashio::config 'port')
 
-if ! [[ "${port}" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
-    bashio::log.error "Invalid port: ${port} (must be 1-65535)"
+if ! [[ "${port}" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65534 )); then
+    bashio::log.error "Invalid port: ${port} (must be 1-65534: the emulator itself takes port+1 internally)"
     exit 1
 fi
+
+# Two-port split (upstream design constraint, see server.mjs take()): the
+# relay and the emulator cannot share one port. If the relay binds 0.0.0.0
+# first, the emulator's someoneListens probe sees it answering and refuses
+# the port as taken; if the emulator binds 127.0.0.1 first, the relay's
+# wildcard bind fails with EADDRINUSE. So the emulator takes a loopback-only
+# internal port (never mapped to the host) and the relay listens on the
+# public port, forwarding with the Host header rewritten to the internal one.
+INT_PORT=$((port + 1))
 
 FIRMWARE=$(bashio::config 'firmware')
 case "${FIRMWARE}" in
@@ -19,15 +28,23 @@ case "${FIRMWARE}" in
 esac
 
 export EMU_PORT="${port}"
+export EMU_INT_PORT="${INT_PORT}"
 export EMU_FIRMWARE
 # Persist for the longrun services. S6 gives each run script a fresh env,
 # so export alone does not reach them (hence the missing /run file): write
 # container_environment files, which with-contenv loads for later services.
 mkdir -p /run/busy-emulator /var/run/s6/container_environment
 echo "${port}" > /run/busy-emulator/port
+echo "${INT_PORT}" > /run/busy-emulator/int_port
 echo "${EMU_FIRMWARE}" > /run/busy-emulator/firmware
 printf '%s' "${port}" > /var/run/s6/container_environment/EMU_PORT
+printf '%s' "${INT_PORT}" > /var/run/s6/container_environment/EMU_INT_PORT
 printf '%s' "${EMU_FIRMWARE}" > /var/run/s6/container_environment/EMU_FIRMWARE
 
+# Render the ingress vhost with the actual internal port: nginx proxies the
+# Supervisor-only 8099 window straight to the emulator's loopback listener.
+sed "s/__EMU_INT_PORT__/${INT_PORT}/g" \
+    /etc/nginx/ingress.conf.template > /etc/nginx/http.d/ingress.conf
+
 mkdir -p /data/emulator
-bashio::log.info "BUSY Bar emulator: port=${port} firmware=${EMU_FIRMWARE} data=/data/emulator"
+bashio::log.info "BUSY Bar emulator: port=${port} internal=${INT_PORT} firmware=${EMU_FIRMWARE} data=/data/emulator"

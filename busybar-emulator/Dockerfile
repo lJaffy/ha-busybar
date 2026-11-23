@@ -59,7 +59,8 @@ RUN node --check /opt/busy-emulator/server/index.mjs \
     && test -f /opt/busy-emulator/engine/build/1.3.1/runtime.wasm
 
 COPY rootfs /
-COPY ingress.conf /etc/nginx/http.d/ingress.conf
+# No COPY of ingress.conf: init-emulator renders it from
+# rootfs/etc/nginx/ingress.conf.template with the actual internal port.
 
 LABEL \
   io.hass.version="${BUILD_VERSION}" \

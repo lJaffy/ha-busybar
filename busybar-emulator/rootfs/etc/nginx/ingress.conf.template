@@ -7,7 +7,7 @@ server {
 
     # proxy_set_header Host: the emulator's entry guard admits only
     # Host 127.0.0.1:<port>/localhost:<port>, even from localhost.
-    set $emu 127.0.0.1:8640;
+    set $emu 127.0.0.1:__EMU_INT_PORT__;
 
     # Flat window UI under ingress. The emulator's page uses absolute asset
     # paths (/emulator/*, /_nuxt/*) which resolve against the ingress prefix,
@@ -22,7 +22,7 @@ server {
         sub_filter '"/api/' '"./api/';
         sub_filter "'/api/" "'./api/";
 
-        proxy_pass http://127.0.0.1:8640/emulator;
+        proxy_pass http://127.0.0.1:__EMU_INT_PORT__/emulator;
         proxy_set_header Host $emu;
         proxy_set_header X-Forwarded-For 172.30.32.2;
         proxy_set_header X-Ingress-Path $http_x_ingress_path;
@@ -30,7 +30,7 @@ server {
 
     # State stream and any nested API calls the window makes.
     location /api/ {
-        proxy_pass http://127.0.0.1:8640;
+        proxy_pass http://127.0.0.1:__EMU_INT_PORT__;
         proxy_set_header Host $emu;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -38,12 +38,12 @@ server {
     }
 
     location /_nuxt/ {
-        proxy_pass http://127.0.0.1:8640;
+        proxy_pass http://127.0.0.1:__EMU_INT_PORT__;
         proxy_set_header Host $emu;
     }
 
     location /emulator/ {
-        proxy_pass http://127.0.0.1:8640;
+        proxy_pass http://127.0.0.1:__EMU_INT_PORT__;
         proxy_set_header Host $emu;
     }
 }
