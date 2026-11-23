@@ -14,12 +14,22 @@
 PORT="${EMU_PORT:-$(cat /run/busy-emulator/port 2>/dev/null)}"
 : "${PORT:?EMU_PORT unset: init-emulator must run first}"
 
+EMU_UP=0
 for _ in $(seq 1 60); do
     if (echo > /dev/tcp/127.0.0.1/"${PORT}") >/dev/null 2>&1; then
+        EMU_UP=1
         break
     fi
     sleep 1
 done
+
+# Never run a dead relay: if the emulator did not come up, exit non-zero so
+# s6 restarts this service (and the emulator crash takes the container down
+# via its finish script) instead of proxying into a refused port forever.
+if [ "${EMU_UP}" -ne 1 ]; then
+    bashio::log.error "Emulator not listening on 127.0.0.1:${PORT} after 60s; not starting relay"
+    exit 1
+fi
 
 bashio::log.info "Relaying 0.0.0.0:${PORT} -> 127.0.0.1:${PORT} (Host rewritten)"
 exec python3 /usr/bin/busy-relay "${PORT}" "${PORT}"

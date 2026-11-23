@@ -7,13 +7,29 @@ preserves the client's original Host (e.g. 192.168.x.x:8640) and is refused
 with 403. This relay rewrites Host to 127.0.0.1:<target> before forwarding,
 and streams both directions afterwards. No request/response parsing beyond
 the header block; bodies and WebSocket upgrades pass through untouched.
+
+Bounded concurrency: a fixed worker pool (100 connection slots) with socket
+timeouts, so a connection burst (Supervisor health checks, HA polling,
+integration discovery all hitting the freshly opened port at once) queues
+instead of spawning a thread per connection until the process runs out of
+file descriptors (Errno 24).
 """
+import concurrent.futures
 import socket
 import sys
-import threading
 
 LISTEN_PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8640
 TARGET_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8640
+
+# Connection slots: each active relay holds 2 sockets + 2 threads. 100 slots
+# stays far below the container's default nofile limit (1024) even if every
+# slot is busy, and bursts beyond that wait in the listen backlog instead of
+# exhausting fds.
+MAX_WORKERS = 100
+# Idle connections (health checks that connect and linger, half-open mobile
+# app sockets) must not hold a slot forever.
+SOCKET_TIMEOUT = 30.0
+HEADER_LIMIT = 65536
 
 
 def pipe(a, b):
@@ -33,7 +49,10 @@ def pipe(a, b):
 
 
 def handle(client):
+    # Timeouts so a stalled peer cannot hold a worker slot indefinitely.
+    client.settimeout(SOCKET_TIMEOUT)
     server = socket.socket()
+    server.settimeout(SOCKET_TIMEOUT)
     try:
         server.connect(("127.0.0.1", TARGET_PORT))
     except OSError:
@@ -44,13 +63,9 @@ def handle(client):
         while b"\r\n\r\n" not in head:
             chunk = client.recv(1)
             if not chunk:
-                client.close()
-                server.close()
                 return
             head += chunk
-            if len(head) > 65536:
-                client.close()
-                server.close()
+            if len(head) > HEADER_LIMIT:
                 return
         header, rest = head.split(b"\r\n\r\n", 1)
         lines = header.split(b"\r\n")
@@ -61,9 +76,23 @@ def handle(client):
             for ln in lines[1:]
         ]
         server.sendall(b"\r\n".join(fixed) + b"\r\n\r\n" + rest)
-        t = threading.Thread(target=pipe, args=(server, client), daemon=True)
-        t.start()
-        pipe(client, server)
+        t = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        # Stream server->client in the background; this direction runs here.
+        fut = t.submit(pipe, server, client)
+        try:
+            pipe(client, server)
+        finally:
+            # Client is done: unblock the reverse direction, then wait for it
+            # briefly so both sockets close before the slot is released.
+            try:
+                server.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                fut.result(timeout=5)
+            except Exception:
+                pass
+            t.shutdown(wait=False)
     finally:
         client.close()
         server.close()
@@ -72,8 +101,10 @@ def handle(client):
 sock = socket.socket()
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(("0.0.0.0", LISTEN_PORT))
-sock.listen(50)
+sock.listen(128)
 print(f"relay 0.0.0.0:{LISTEN_PORT} -> 127.0.0.1:{TARGET_PORT} (Host rewritten)", flush=True)
-while True:
-    conn, _ = sock.accept()
-    threading.Thread(target=handle, args=(conn,), daemon=True).start()
+with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS,
+                                           thread_name_prefix="relay") as pool:
+    while True:
+        conn, _ = sock.accept()
+        pool.submit(handle, conn)
