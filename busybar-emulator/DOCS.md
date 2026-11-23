@@ -1,4 +1,10 @@
-# BUSY Bar Emulator
+# BUSY Bar Emulator (unofficial community app)
+
+> **Unofficial packaging.** This app is maintained by
+> [lJaffy](https://github.com/lJaffy/ha-busybar) and is not affiliated with
+> or endorsed by BUSY. It bundles the open-source
+> [busybar-emulator](https://github.com/busy-app/busybar-emulator) (GPL-2.0-or-later)
+> as a Home Assistant app.
 
 A self-contained virtual [BUSY Bar](https://busy.app): the open-source
 [busybar-emulator](https://github.com/busy-app/busybar-emulator) headless

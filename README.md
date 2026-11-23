@@ -1,4 +1,8 @@
-# BUSY Bar apps for Home Assistant
+# BUSY Bar apps for Home Assistant (unofficial)
+
+> **Community packaging, not an official BUSY project.** Maintained at
+> [lJaffy/ha-busybar](https://github.com/lJaffy/ha-busybar). Upstream
+> emulator and integration links below belong to BUSY.
 
 Self-contained [BUSY Bar emulator](https://github.com/busy-app/busybar-emulator)
 packaged as a Home Assistant app (formerly add-on): a virtual BUSY Bar with its

@@ -52,5 +52,5 @@ LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="app" \
   io.hass.arch="${BUILD_ARCH}" \
-  org.opencontainers.image.source="https://github.com/busy-app/busybar-emulator" \
-  org.opencontainers.image.description="BUSY Bar emulator (GPL-2.0-or-later) packaged as a Home Assistant app"
+  org.opencontainers.image.source="https://github.com/lJaffy/ha-busybar" \
+  org.opencontainers.image.description="Unofficial community packaging of the BUSY Bar emulator (GPL-2.0-or-later) as a Home Assistant app"

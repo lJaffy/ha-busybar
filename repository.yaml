@@ -1,3 +1,3 @@
-name: "BUSY Bar apps"
-url: "https://github.com/busy-app/ha-busy-apps"
-maintainer: "BUSY (https://busy.app)"
+name: "BUSY Bar apps (community)"
+url: "https://github.com/lJaffy/ha-busybar"
+maintainer: "lJaffy (unofficial community packaging of https://github.com/busy-app/busybar-emulator)"

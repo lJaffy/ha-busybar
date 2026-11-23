@@ -2,7 +2,7 @@ name: "BUSY Bar Emulator"
 slug: "busybar_emulator"
 version: "0.1.0"
 description: "Self-contained virtual BUSY Bar: the emulator's headless server with its HTTP API and flat window UI, controllable by the BUSY HACS integration — no physical device needed."
-url: "https://github.com/busy-app/ha-busy-apps/tree/main/busybar-emulator"
+url: "https://github.com/lJaffy/ha-busybar/tree/main/busybar-emulator"
 arch:
   - amd64
   - aarch64
@@ -10,7 +10,7 @@ init: false
 startup: application
 boot: auto
 stage: experimental
-image: "ghcr.io/busy-app/{arch}-busybar-emulator"
+image: "ghcr.io/ljaffy/ha-busybar-emulator"
 ports:
   8640/tcp: 8640
 ports_description:
